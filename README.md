@@ -14,8 +14,8 @@
 
 1. Clone repository:
 ```bash
-git clone [repository-url]
-cd [repository-name]
+git clone https://github.com/ntanhhh/CCCD_Extractor.git
+cd CCCD_Extractor
 ```
 
 2. Cài đặt các dependencies:
@@ -24,9 +24,9 @@ pip install -r requirements.txt
 ```
 
 3. Tải các model cần thiết:
-- YOLOv8 model cho CMND cũ: `runs/detect/train15/weights/best.pt`
-- YOLOv8 model cho CCCD mới: `model/detect_ttin/best.pt`
-- VietOCR model: `model/vgg_transformer.pth`
+- YOLOv8 model cho CMND cũ: `model/detect_ttin/cccd_cu.pt`
+- YOLOv8 model cho CCCD mới: `model/detect_ttin/cccd_moi.pt`
+- VietOCR model đã fine-tune: `model/finetune_vietocr`
 
 ## Sử dụng
 
@@ -46,10 +46,9 @@ uvicorn main:app --reload
 ├── requirements.txt     # Project dependencies
 ├── templates/          # HTML templates
 │   └── index.html      # Main web interface
-├── model/              # Model files
-│   ├── detect_ttin/    # YOLOv8 model for new ID cards
-│   └── vgg_transformer.pth  # VietOCR model
-└── runs/               # YOLOv8 training results
-    └── detect/
-        └── train15/    # YOLOv8 model for old ID cards
+└── model/              # Model files
+    ├── detect_ttin/    # YOLOv8 models
+    │   ├── cccd_cu.pt  # Model for old ID cards
+    │   └── cccd_moi.pt # Model for new ID cards
+    └── finetune_vietocr/ # Fine-tuned VietOCR model
 ``` 

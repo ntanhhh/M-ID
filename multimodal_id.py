@@ -37,8 +37,8 @@ def non_max_suppression_fast(boxes, labels, overlapThresh=0.3):
 class MultimodalIDSystem:
     def __init__(self):
         # Load both YOLOv8 models
-        self.old_id_model = YOLO("runs/detect/train15/weights/best.pt")
-        self.new_id_model = YOLO("model/detect_ttin/best.pt")
+        self.old_id_model = YOLO("model/detect_ttin/cccd_cu.pt")
+        self.new_id_model = YOLO("model/detect_ttin/cccd_moi.pt")
         
         # Load VietOCR
         self.vietocr_detector = self.load_vietocr()
@@ -48,8 +48,8 @@ class MultimodalIDSystem:
         os.makedirs(self.cropped_dir, exist_ok=True)
 
     def load_vietocr(self):
-        config = Cfg.load_config_from_name('vgg_transformer')
-        config['weights'] = 'model/vgg_transformer.pth'
+        config = Cfg.load_config_from_file('model/finetune_vietocr/config.yml')
+        config['weights'] = 'model/finetune_vietocr/transformerocr.pth'
         config['device'] = 'cpu'
         return Predictor(config)
 
