@@ -36,26 +36,48 @@ def find_missing_corner(coords):
 def estimate_missing_corner(coords):
     missing = find_missing_corner(coords)
     if missing == 'top_left':
-        coords['top_left'] = [2 * coords['bottom_left'][0] - coords['bottom_right'][0],
-                              2 * coords['top_right'][1] - coords['bottom_right'][1]]
+        # Tính trung điểm của top_right và bottom_left
+        mid_x = (coords['top_right'][0] + coords['bottom_left'][0]) / 2
+        mid_y = (coords['top_right'][1] + coords['bottom_left'][1]) / 2
+        # Tính top_left dựa trên trung điểm và bottom_right
+        coords['top_left'] = [2 * mid_x - coords['bottom_right'][0],
+                             2 * mid_y - coords['bottom_right'][1]]
     elif missing == 'top_right':
-        coords['top_right'] = [2 * coords['bottom_right'][0] - coords['bottom_left'][0],
-                               2 * coords['top_left'][1] - coords['bottom_left'][1]]
+        # Tính trung điểm của top_left và bottom_right
+        mid_x = (coords['top_left'][0] + coords['bottom_right'][0]) / 2
+        mid_y = (coords['top_left'][1] + coords['bottom_right'][1]) / 2
+        # Tính top_right dựa trên trung điểm và bottom_left
+        coords['top_right'] = [2 * mid_x - coords['bottom_left'][0],
+                              2 * mid_y - coords['bottom_left'][1]]
     elif missing == 'bottom_left':
-        coords['bottom_left'] = [2 * coords['top_left'][0] - coords['top_right'][0],
-                                 2 * coords['bottom_right'][1] - coords['top_right'][1]]
+        # Tính trung điểm của top_left và bottom_right
+        mid_x = (coords['top_left'][0] + coords['bottom_right'][0]) / 2
+        mid_y = (coords['top_left'][1] + coords['bottom_right'][1]) / 2
+        # Tính bottom_left dựa trên trung điểm và top_right
+        coords['bottom_left'] = [2 * mid_x - coords['top_right'][0],
+                                2 * mid_y - coords['top_right'][1]]
     elif missing == 'bottom_right':
-        coords['bottom_right'] = [2 * coords['top_right'][0] - coords['top_left'][0],
-                                  2 * coords['bottom_left'][1] - coords['top_left'][1]]
+        # Tính trung điểm của top_right và bottom_left
+        mid_x = (coords['top_right'][0] + coords['bottom_left'][0]) / 2
+        mid_y = (coords['top_right'][1] + coords['bottom_left'][1]) / 2
+        # Tính bottom_right dựa trên trung điểm và top_left
+        coords['bottom_right'] = [2 * mid_x - coords['top_left'][0],
+                                 2 * mid_y - coords['top_left'][1]]
     return coords
 
 def perspective_transform(image, points):
-    width = int(np.linalg.norm(np.array(points['top_right']) - np.array(points['top_left'])))
-    height = int(np.linalg.norm(np.array(points['bottom_left']) - np.array(points['top_left'])))
-    dest_points = np.float32([[0, 0], [width-1, 0], [width-1, height-1], [0, height-1]])
-    source_points = np.float32([points['top_left'], points['top_right'], points['bottom_right'], points['bottom_left']])
+    # Điểm đích cố định với kích thước 500x300
+    dest_points = np.float32([[0, 0], [500, 0], [500, 300], [0, 300]])
+    
+    # Điểm nguồn từ 4 góc của tài liệu
+    source_points = np.float32([points['top_left'], points['top_right'], 
+                               points['bottom_right'], points['bottom_left']])
+    
+    # Tính ma trận biến đổi
     M = cv2.getPerspectiveTransform(source_points, dest_points)
-    return cv2.warpPerspective(image, M, (width, height))
+    
+    # Thực hiện biến đổi phối cảnh
+    return cv2.warpPerspective(image, M, (500, 300))
 
 def crop_image(result, img):
     tensor = result.boxes.xyxy.cpu().numpy()
@@ -153,6 +175,6 @@ def process_image(image_path, output_dir, model):
 
 if __name__ == "__main__":
     model = YOLO("runs/detect/train16/weights/best.pt")
-    image_path = "dataset/cmnd/712_jpg.rf.58a8a082946c210088323ee8aa1a4237.jpg"
+    image_path = "dataset/test_roboflow/z6415065505979_74dc5d6d47ea708045f7c19c4e37f317.jpg"
     output_dir = "cropped_images"
     process_image(image_path, output_dir, model)

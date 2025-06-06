@@ -89,23 +89,12 @@ class MultimodalIDSystem:
         # Áp dụng non-max suppression
         final_boxes, final_labels = non_max_suppression_fast(boxes, labels)
         
-        print(f"\nTìm thấy {len(final_boxes)} vùng phát hiện sau NMS")
-        
         # Xử lý từng box phát hiện
         cropped_regions = []
         region_labels = []
         
-        for i, (box, label) in enumerate(zip(final_boxes, final_labels)):
+        for box, label in zip(final_boxes, final_labels):
             x1, y1, x2, y2 = box
-            conf = results[0].boxes.conf[i].item()
-            
-            # In tọa độ box phát hiện và độ tin cậy
-            print(f"\nBox phát hiện {i+1} ({label}):")
-            print(f"Độ tin cậy: {conf:.2f}")
-            print(f"Góc trên trái: ({x1}, {y1})")
-            print(f"Góc dưới phải: ({x2}, {y2})")
-            print(f"Chiều rộng: {x2-x1}, Chiều cao: {y2-y1}")
-            
             # Cắt ảnh
             cropped = image[int(y1):int(y2), int(x1):int(x2)]
             cropped_regions.append(cropped)
