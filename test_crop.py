@@ -118,8 +118,16 @@ def crop_image(result, img):
             print("Ảnh đã chụp sát, không cần cắt thêm.")
             return img
         else:
-            print("Ảnh không đủ góc, không thể crop. Giữ nguyên ảnh.")
-            return img
+            # Thử nội suy góc thiếu
+            missing = find_missing_corner(final_points)
+            if missing:
+                print(f"Phát hiện thiếu góc {missing}, thử nội suy...")
+                estimated_points = estimate_missing_corner(final_points.copy())
+                print("Đã nội suy góc thiếu, tiến hành crop.")
+                return perspective_transform(img, estimated_points)
+            else:
+                print("Ảnh không đủ góc, không thể crop. Giữ nguyên ảnh.")
+                return img
 
 
 def process_image(image_path, output_dir, model):
