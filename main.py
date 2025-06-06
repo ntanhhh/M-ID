@@ -2,6 +2,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 from pydantic import BaseModel
 import uvicorn
 import os
@@ -23,6 +25,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Cấu hình templates
+templates = Jinja2Templates(directory="templates")
+
 # Tạo thư mục để lưu ảnh tạm thời
 UPLOAD_DIR = "temp_uploads"
 CROPPED_DIR = "cropped_images"
@@ -33,11 +38,15 @@ os.makedirs(CROPPED_DIR, exist_ok=True)
 app.mount("/cropped_images", StaticFiles(directory="cropped_images"), name="cropped_images")
 
 # Khởi tạo các model
-crop_model = YOLO("runs/detect/train16/weights/best.pt")
+crop_model = YOLO("model/detect_4goc/cropper.pt")
 id_system = MultimodalIDSystem()
 
 class FilePath(BaseModel):
     file_path: str
+
+@app.get("/")
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
@@ -110,10 +119,6 @@ async def extract_info(file_data: FilePath):
     except Exception as e:
         print(f"Unexpected error in extract_info: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi không xác định: {str(e)}")
-
-@app.get("/")
-async def read_root():
-    return {"message": "ID Card Processing API"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
