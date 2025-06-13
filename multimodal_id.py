@@ -112,9 +112,6 @@ class MultimodalIDSystem:
         return text
 
     def process_id_card(self, image_path):
-        print(f"\nĐang xử lý CCCD: {image_path}")
-        
-        # Đọc ảnh
         image = cv2.imread(image_path)
         if image is None:
             print("Lỗi: Không thể đọc ảnh")
@@ -122,9 +119,7 @@ class MultimodalIDSystem:
 
         # Phát hiện loại CCCD và lấy kết quả
         id_type, results = self.detect_id_type(image)
-        print(f"\nLoại CCCD đã phát hiện: {id_type}")
-        
-        # Cắt các vùng của CCCD
+
         cropped_regions, region_labels = self.crop_id_card(image, results)
         if cropped_regions is None:
             print("Lỗi: Không thể phát hiện CCCD")
@@ -132,58 +127,34 @@ class MultimodalIDSystem:
 
         # Xử lý từng vùng đã cắt
         label_data = {}
-        text_positions = {}  # Lưu văn bản với tọa độ y
-        y_max_positions = {}  # Theo dõi vị trí y cao nhất cho mỗi nhãn
-        
-        print(f"\nĐang xử lý loại CCCD: {id_type}")
-        print("\nCác vùng và nhãn đã phát hiện:")
-        for i, (box, label) in enumerate(zip(results[0].boxes.xyxy, region_labels)):
-            print(f"Vùng {i+1}: {label} tại y={box[1]}")
+        y_positions = {}  # Chỉ cần lưu một vị trí y cho mỗi nhãn
         
         for i, (cropped, label) in enumerate(zip(cropped_regions, region_labels)):
-            # Lưu ảnh đã cắt
-            output_path = os.path.join(self.cropped_dir, f"cropped_{i}_{os.path.basename(image_path)}")
-            cv2.imwrite(output_path, cropped)
-            print(f"\nĐang xử lý vùng {i+1} ({label})")
-
-            # Trích xuất văn bản
             text = self.extract_text(cropped)
-            print(f"Văn bản đã trích xuất: {text}")
-
-            # Lấy tọa độ y của box phát hiện
-            y_coord = results[0].boxes.xyxy[i][1].item()  # tọa độ y1
-            print(f"Tọa độ y: {y_coord}")
-
-            # Lưu văn bản với vị trí của nó
-            if label not in text_positions:
-                text_positions[label] = []
-                y_max_positions[label] = 0
-            text_positions[label].append((y_coord, text))
-            y_max_positions[label] = max(y_max_positions[label], y_coord)
-
-        # Sắp xếp và kết hợp văn bản cho mỗi nhãn
-        for label, positions in text_positions.items():
-            # Sắp xếp dựa trên tọa độ y (từ trên xuống dưới)
-            positions.sort(key=lambda x: x[0])
+            y_coord = results[0].boxes.xyxy[i][1].item()
             
-            # Đảo ngược thứ tự cho cả POO và POR trong cả CCCD cũ và mới
-            if label.lower() in ['poo', 'por']:
-                positions.reverse()
-            
-            # Kết hợp văn bản dựa trên so sánh tọa độ y
-            combined_text = ""
-            for y_coord, text in positions:
-                if y_coord > y_max_positions[label]:
-                    combined_text = text + ", " + combined_text if combined_text else text
+            # Xử lý nhãn có hậu tố _new hoặc _old
+            if label.endswith('_new') or label.endswith('_old'):
+                base_label = label.replace('_new', '').replace('_old', '')
+                if base_label in label_data:
+                    if y_coord > y_positions[base_label]:
+                        label_data[base_label] = label_data[base_label] + ", " + text
+                    else:
+                        label_data[base_label] = text + ", " + label_data[base_label]
+                    y_positions[base_label] = max(y_positions[base_label], y_coord)
                 else:
-                    combined_text = combined_text + ", " + text if combined_text else text
-            
-            label_data[label] = combined_text
-            print(f"Văn bản đã kết hợp cho {label}: {combined_text}")
-
-        print("\nDữ liệu nhãn cuối cùng:")
-        for label, text in label_data.items():
-            print(f"Nhãn: '{label}', Văn bản: '{text}'")
+                    label_data[base_label] = text
+                    y_positions[base_label] = y_coord
+            else:
+                if label in label_data:
+                    if y_coord > y_positions[label]:
+                        label_data[label] = label_data[label] + ", " + text
+                    else:
+                        label_data[label] = text + ", " + label_data[label]
+                    y_positions[label] = max(y_positions[label], y_coord)
+                else:
+                    label_data[label] = text
+                    y_positions[label] = y_coord
 
         # Kết hợp tất cả văn bản theo thứ tự đúng
         ordered_labels = ["Id", "Name", "Date", "Sex", "Nation", "POO", "POR"]
@@ -203,7 +174,6 @@ class MultimodalIDSystem:
 
         # Tạo cả all_text và all_info
         for label in ordered_labels:
-            # Thử cả chữ hoa và chữ thường
             label_lower = label.lower()
             value = label_data.get(label) or label_data.get(label_lower, "")
             if value:
@@ -217,19 +187,8 @@ class MultimodalIDSystem:
                 all_text += f"{display_name}: {value}\n"
                 all_info[label] = value.strip()
 
-        # In thông tin đã phân tích
-        print("\nThông tin đã phân tích:")
-        print("-" * 50)
-        for field, value in all_info.items():
-            if value:  # Chỉ in các trường đã tìm thấy
-                display_name = display_names.get(field, field.upper())
-                print(f"{display_name}: {value}")
-        print("-" * 50)
-
         return {
             'id_type': id_type,
-            'cropped_image_paths': [os.path.join(self.cropped_dir, f"cropped_{i}_{os.path.basename(image_path)}") 
-                                  for i in range(len(cropped_regions))],
             'extracted_text': all_text,
             'parsed_info': all_info
         }
@@ -261,7 +220,6 @@ if __name__ == "__main__":
             if result:
                 print("\nKết quả cuối cùng:")
                 print(f"Loại CCCD: {result['id_type']}")
-                print(f"Đường dẫn ảnh đã cắt: {result['cropped_image_paths']}")
                 print("\nVăn bản đã trích xuất:")
                 print(result['extracted_text'])
                 print("\nThông tin đã phân tích:")

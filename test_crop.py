@@ -28,56 +28,91 @@ def non_max_suppression_fast(boxes, labels, overlapThresh):
         idxs = np.delete(idxs, np.concatenate(([last], np.where(overlap > overlapThresh)[0])))
     return boxes[pick].astype("int"), [labels[idx] for idx in pick]
 
+def convert_to_new_labels(labels):
+    """Chuyển đổi nhãn cũ thành nhãn mới"""
+    new_labels = []
+    for label in labels:
+        if label in ['top_left', 'top_right', 'bottom_left', 'bottom_right']:
+            new_labels.append(f"{label}_new")
+        else:
+            new_labels.append(label)
+    return new_labels
+
 def find_missing_corner(coords):
-    corners = ['top_left', 'top_right', 'bottom_left', 'bottom_right']
+    # Kiểm tra cả nhãn mới và cũ
+    corners = ['top_left_new', 'top_right_new', 'bottom_left_new', 'bottom_right_new',
+              'top_left_old', 'top_right_old', 'bottom_left_old', 'bottom_right_old']
     missing = [c for c in corners if c not in coords]
     return missing[0] if missing else None
 
 def estimate_missing_corner(coords):
     missing = find_missing_corner(coords)
-    if missing == 'top_left':
-        # Tính trung điểm của top_right và bottom_left
-        mid_x = (coords['top_right'][0] + coords['bottom_left'][0]) / 2
-        mid_y = (coords['top_right'][1] + coords['bottom_left'][1]) / 2
-        # Tính top_left dựa trên trung điểm và bottom_right
-        coords['top_left'] = [2 * mid_x - coords['bottom_right'][0],
-                             2 * mid_y - coords['bottom_right'][1]]
-    elif missing == 'top_right':
-        # Tính trung điểm của top_left và bottom_right
-        mid_x = (coords['top_left'][0] + coords['bottom_right'][0]) / 2
-        mid_y = (coords['top_left'][1] + coords['bottom_right'][1]) / 2
-        # Tính top_right dựa trên trung điểm và bottom_left
-        coords['top_right'] = [2 * mid_x - coords['bottom_left'][0],
-                              2 * mid_y - coords['bottom_left'][1]]
-    elif missing == 'bottom_left':
-        # Tính trung điểm của top_left và bottom_right
-        mid_x = (coords['top_left'][0] + coords['bottom_right'][0]) / 2
-        mid_y = (coords['top_left'][1] + coords['bottom_right'][1]) / 2
-        # Tính bottom_left dựa trên trung điểm và top_right
-        coords['bottom_left'] = [2 * mid_x - coords['top_right'][0],
-                                2 * mid_y - coords['top_right'][1]]
-    elif missing == 'bottom_right':
-        # Tính trung điểm của top_right và bottom_left
-        mid_x = (coords['top_right'][0] + coords['bottom_left'][0]) / 2
-        mid_y = (coords['top_right'][1] + coords['bottom_left'][1]) / 2
-        # Tính bottom_right dựa trên trung điểm và top_left
-        coords['bottom_right'] = [2 * mid_x - coords['top_left'][0],
-                                 2 * mid_y - coords['top_left'][1]]
+    if not missing:
+        return coords
+
+    # Xác định loại góc (new hoặc old)
+    corner_type = 'new' if 'new' in missing else 'old'
+    base_corner = missing.replace('_new', '').replace('_old', '')
+
+    # Lấy các góc tương ứng
+    if base_corner == 'top_left':
+        ref1 = f'top_right_{corner_type}'
+        ref2 = f'bottom_left_{corner_type}'
+        target = f'bottom_right_{corner_type}'
+    elif base_corner == 'top_right':
+        ref1 = f'top_left_{corner_type}'
+        ref2 = f'bottom_right_{corner_type}'
+        target = f'bottom_left_{corner_type}'
+    elif base_corner == 'bottom_left':
+        ref1 = f'top_left_{corner_type}'
+        ref2 = f'bottom_right_{corner_type}'
+        target = f'top_right_{corner_type}'
+    else:  # bottom_right
+        ref1 = f'top_right_{corner_type}'
+        ref2 = f'bottom_left_{corner_type}'
+        target = f'top_left_{corner_type}'
+
+    # Kiểm tra xem các góc tham chiếu có tồn tại không
+    if ref1 not in coords or ref2 not in coords or target not in coords:
+        print(f"Không đủ góc để nội suy góc {missing}")
+        return coords
+
+    # Tính toán góc thiếu
+    mid_x = (coords[ref1][0] + coords[ref2][0]) / 2
+    mid_y = (coords[ref1][1] + coords[ref2][1]) / 2
+    coords[missing] = [2 * mid_x - coords[target][0],
+                      2 * mid_y - coords[target][1]]
     return coords
 
-def perspective_transform(image, points):
-    # Điểm đích cố định với kích thước 500x300
+def perspective_transform(image, points, corner_type='new'):
     dest_points = np.float32([[0, 0], [500, 0], [500, 300], [0, 300]])
     
-    # Điểm nguồn từ 4 góc của tài liệu
-    source_points = np.float32([points['top_left'], points['top_right'], 
-                               points['bottom_right'], points['bottom_left']])
+    # Kiểm tra xem tất cả các góc cần thiết có tồn tại không
+    required_corners = [
+        f'top_left_{corner_type}',
+        f'top_right_{corner_type}',
+        f'bottom_right_{corner_type}',
+        f'bottom_left_{corner_type}'
+    ]
     
-    # Tính ma trận biến đổi
-    M = cv2.getPerspectiveTransform(source_points, dest_points)
+    for corner in required_corners:
+        if corner not in points:
+            print(f"Thiếu góc {corner}, không thể thực hiện perspective transform")
+            return image
+
+    source_points = np.float32([
+        points[f'top_left_{corner_type}'],
+        points[f'top_right_{corner_type}'],
+        points[f'bottom_right_{corner_type}'],
+        points[f'bottom_left_{corner_type}']
+    ])
     
-    # Thực hiện biến đổi phối cảnh
-    return cv2.warpPerspective(image, M, (500, 300))
+    try:
+        M = cv2.getPerspectiveTransform(source_points, dest_points)
+        return cv2.warpPerspective(image, M, (500, 300))
+    except Exception as e:
+        print(f"Lỗi khi thực hiện perspective transform: {str(e)}")
+        return image
 
 def crop_image(result, img):
     tensor = result.boxes.xyxy.cpu().numpy()
@@ -95,13 +130,16 @@ def crop_image(result, img):
     classes = classes[valid_indices]
     labels = [class_names[int(cls)] for cls in classes]
 
+    # Chuyển đổi nhãn cũ thành nhãn mới
+    labels = convert_to_new_labels(labels)
+
     final_boxes, final_labels = non_max_suppression_fast(tensor, labels, 0.3)
 
     if len(final_boxes) < 2:
         print("Detect được quá ít điểm (<2). Giữ nguyên ảnh.")
         return img
 
-    # ✅ Chọn box có độ tin cậy cao nhất cho mỗi label
+    # Chọn box có độ tin cậy cao nhất cho mỗi label
     boxes_by_label = {}
     for box, label, conf in zip(final_boxes, final_labels, confidences):
         if label not in boxes_by_label:
@@ -110,7 +148,7 @@ def crop_image(result, img):
 
     final_points = {}
     for label, box_conf_list in boxes_by_label.items():
-        best_box, _ = max(box_conf_list, key=lambda x: x[1])  # Chọn box có confidence cao nhất
+        best_box, _ = max(box_conf_list, key=lambda x: x[1])
         center_point = [(best_box[0] + best_box[2]) / 2, (best_box[1] + best_box[3]) / 2]
         final_points[label] = center_point
 
@@ -122,35 +160,39 @@ def crop_image(result, img):
     img_area = img.shape[0] * img.shape[1]
     ratio = bbox_area / img_area
 
-    required_labels = {'top_left', 'top_right', 'bottom_left', 'bottom_right'}
-    has_all_corners = set(final_points.keys()) == required_labels
+    # Kiểm tra đủ góc cho cả new và old
+    required_labels_new = {f'{corner}_new' for corner in ['top_left', 'top_right', 'bottom_left', 'bottom_right']}
+    required_labels_old = {f'{corner}_old' for corner in ['top_left', 'top_right', 'bottom_left', 'bottom_right']}
+    
+    has_all_corners_new = set(final_points.keys()) >= required_labels_new
+    has_all_corners_old = set(final_points.keys()) >= required_labels_old
 
-    print(f"Thông số phân tích:")
     print(f"- Diện tích vùng phát hiện: {ratio*100:.2f}% so với ảnh")
 
-    if has_all_corners:
+    if has_all_corners_new or has_all_corners_old:
         if ratio > 0.85:
             print("Ảnh đã chụp quá sát, giữ nguyên ảnh, không cắt.")
             return img
         else:
-            print("Đủ 4 góc và thỏa mãn các điều kiện. Tiến hành crop.")
-            return perspective_transform(img, final_points)
+            corner_type = 'new' if has_all_corners_new else 'old'
+            print(f"Đủ 4 góc ({corner_type}) và thỏa mãn các điều kiện. Tiến hành crop.")
+            return perspective_transform(img, final_points, corner_type)
     else:
         if ratio > 0.85:
             print("Ảnh đã chụp sát, không cần cắt thêm.")
             return img
         else:
-            # Thử nội suy góc thiếu
+            # Thử nội suy góc thiếu cho cả new và old
             missing = find_missing_corner(final_points)
             if missing:
                 print(f"Phát hiện thiếu góc {missing}, thử nội suy...")
                 estimated_points = estimate_missing_corner(final_points.copy())
-                print("Đã nội suy góc thiếu, tiến hành crop.")
-                return perspective_transform(img, estimated_points)
+                corner_type = 'new' if 'new' in missing else 'old'
+                print(f"Đã nội suy góc thiếu ({corner_type}), tiến hành crop.")
+                return perspective_transform(img, estimated_points, corner_type)
             else:
                 print("Ảnh không đủ góc, không thể crop. Giữ nguyên ảnh.")
                 return img
-
 
 def process_image(image_path, output_dir, model):
     img = cv2.imread(image_path)
@@ -167,14 +209,14 @@ def process_image(image_path, output_dir, model):
             output_filename = f"cropped_{uuid.uuid4().hex}.jpg"
             output_path = os.path.join(output_dir, output_filename)
             cv2.imwrite(output_path, cropped_img)
-            print(f"✅ Ảnh đã được cắt và lưu tại: {output_path}")
+            print(f"Ảnh đã được cắt và lưu tại: {output_path}")
             return output_filename
 
     print(f"Không đủ góc để cắt ảnh: {image_path}")
     return None
 
 if __name__ == "__main__":
-    model = YOLO("runs/detect/train16/weights/best.pt")
-    image_path = "dataset/test_roboflow/z6415065505979_74dc5d6d47ea708045f7c19c4e37f317.jpg"
+    model = YOLO("model/detect_4goc/4goc_all.pt")
+    image_path = "dataset/test_roboflow/z6635947338752_d5de6f3f522f8ef7098955aae590c960.jpg"
     output_dir = "cropped_images"
     process_image(image_path, output_dir, model)
