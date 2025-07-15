@@ -10,8 +10,8 @@ import os
 import shutil
 from datetime import datetime
 import uuid
-from test_crop import process_image
-from multimodal_id import MultimodalIDSystem
+from cropper import process_image
+from m_ocr import MOCRSystem
 from ultralytics import YOLO
 
 app = FastAPI(title="ID Card Processing API")
@@ -38,8 +38,8 @@ os.makedirs(CROPPED_DIR, exist_ok=True)
 app.mount("/cropped_images", StaticFiles(directory="cropped_images"), name="cropped_images")
 
 # Khởi tạo các model
-crop_model = YOLO("model/detect_4goc/cropper.pt")
-id_system = MultimodalIDSystem()
+crop_model = YOLO("model/detect_4goc/best.pt")
+id_system = MOCRSystem()
 
 class FilePath(BaseModel):
     file_path: str
@@ -73,7 +73,7 @@ async def crop_image(file_data: FilePath):
             print(f"File not found at path: {file_data.file_path}")
             raise HTTPException(status_code=404, detail=f"Không tìm thấy file tại đường dẫn: {file_data.file_path}")
         
-        # Cắt ảnh sử dụng test_crop với model cắt ảnh
+        # Cắt ảnh sử dụng cropper
         cropped_filename = process_image(file_data.file_path, CROPPED_DIR, crop_model)
         if not cropped_filename:
             raise HTTPException(status_code=400, detail="Không thể cắt ảnh")
@@ -99,7 +99,7 @@ async def extract_info(file_data: FilePath):
             print(f"File not found at path: {full_path}")
             raise HTTPException(status_code=404, detail="Không tìm thấy file")
         
-        # Xử lý ảnh bằng multimodal_id
+        # Xử lý ảnh bằng m_ocr
         try:
             result = id_system.process_id_card(full_path)
             if not result:

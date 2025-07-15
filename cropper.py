@@ -28,16 +28,6 @@ def non_max_suppression_fast(boxes, labels, overlapThresh):
         idxs = np.delete(idxs, np.concatenate(([last], np.where(overlap > overlapThresh)[0])))
     return boxes[pick].astype("int"), [labels[idx] for idx in pick]
 
-def convert_to_new_labels(labels):
-    """Chuyển đổi nhãn cũ thành nhãn mới"""
-    new_labels = []
-    for label in labels:
-        if label in ['top_left', 'top_right', 'bottom_left', 'bottom_right']:
-            new_labels.append(f"{label}_new")
-        else:
-            new_labels.append(label)
-    return new_labels
-
 def find_missing_corner(coords):
     # Kiểm tra cả nhãn mới và cũ
     corners = ['top_left_new', 'top_right_new', 'bottom_left_new', 'bottom_right_new',
@@ -109,7 +99,7 @@ def perspective_transform(image, points, corner_type='new'):
     
     try:
         M = cv2.getPerspectiveTransform(source_points, dest_points)
-        return cv2.warpPerspective(image, M, (500, 300))
+        return cv2.warpPerspective(image, M, (510, 310))
     except Exception as e:
         print(f"Lỗi khi thực hiện perspective transform: {str(e)}")
         return image
@@ -129,9 +119,6 @@ def crop_image(result, img):
     confidences = confidences[valid_indices]
     classes = classes[valid_indices]
     labels = [class_names[int(cls)] for cls in classes]
-
-    # Chuyển đổi nhãn cũ thành nhãn mới
-    labels = convert_to_new_labels(labels)
 
     final_boxes, final_labels = non_max_suppression_fast(tensor, labels, 0.3)
 
@@ -216,7 +203,7 @@ def process_image(image_path, output_dir, model):
     return None
 
 if __name__ == "__main__":
-    model = YOLO("model/detect_4goc/4goc_all.pt")
-    image_path = "dataset/test_roboflow/z6635947338752_d5de6f3f522f8ef7098955aae590c960.jpg"
+    model = YOLO("model/detect_4goc/best.pt")
+    image_path = "test_images/20240128141643_082094002302cicekycfront0_jpg.rf.3ff740beeb2d6c843f77f399fc19f2c3.jpg"
     output_dir = "cropped_images"
     process_image(image_path, output_dir, model)
