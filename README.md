@@ -1,109 +1,89 @@
 # CCCD Extractor
 
-Ứng dụng trích xuất thông tin từ CCCD sử dụng FastAPI và YOLOv8.
+Ứng dụng trích xuất thông tin từ ảnh căn cước công dân (CCCD) sử dụng FastAPI, YOLOv8 và các mô hình OCR.
 
-## Tính năng
+## Chức năng chính
+- Phát hiện và phân loại CCCD cũ/mới tự động
+- Cắt vùng chứa CCCD trên ảnh đầu vào
+- Trích xuất thông tin văn bản từ ảnh CCCD (số, họ tên, ngày sinh, giới tính, quê quán, nơi thường trú...)
+- Giao diện web đơn giản, dễ sử dụng
+- Hỗ trợ API cho tích hợp hệ thống khác
 
-- Phát hiện và phân loại CCCD cũ/mới
-- Cắt ảnh sử dụng YOLOv11
-- Trích xuất thông tin từ ảnh CCCD
+## Hướng dẫn cài đặt
 
-## Cài đặt
-
-1. Clone repository:
+1. **Clone mã nguồn:**
 ```bash
 git clone https://github.com/ntanhhh/CCCD_Extractor.git
 cd CCCD_Extractor
 ```
 
-2. Cài đặt các thư viện cần thiết:
+2. **Cài đặt thư viện Python:**
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Tải các model cần thiết từ [Google Drive](https://drive.google.com/drive/folders/14t1fJQrsg2noPLxsUB854mmRwEP9vU6d?usp=sharing) và đặt vào thư mục `model` với cấu trúc sau:
+3. **Tải các model cần thiết:**
+- Tải các file model từ [Google Drive](https://drive.google.com/drive/folders/14t1fJQrsg2noPLxsUB854mmRwEP9vU6d?usp=sharing)
+- Đặt vào thư mục `model/` với cấu trúc:
 ```
 model/
 ├── detect_ttin/
 │   ├── cccd_cu.pt
 │   └── cccd_moi.pt
 ├── detect_4goc/
-│   └── cropper.pt
+│   └── best.pt
 └── finetune_vietocr/
     ├── config.yml
     └── transformerocr.pth
 ```
 
-## Cấu trúc dự án
+4. **Tạo các thư mục cần thiết:**
+- `cropped_images/` : Lưu ảnh CCCD đã cắt
+- `temp_uploads/`   : Lưu ảnh upload tạm thời
 
+## Cấu trúc thư mục dự án
 ```
 CCCD_Extractor/
-├── main.py                  # FastAPI server, main entry point
-├── m_ocr.py                 # Multimodal OCR logic (VietOCR, Finetuned VietOCR, PaddleOCR)
-├── croper.py                # Image cropping logic
-├── requirements.txt         # Python dependencies
-├── README.md                # Project documentation (this file)
-│
-├── model/                   # All model files (YOLO, VietOCR, PaddleOCR)
-│   ├── detect_ttin/         # YOLO models for old/new CCCD detection
-│   ├── detect_4goc/         # YOLO model for cropping
-│   ├── finetune_vietocr/    # VietOCR weights and config
-│
-├── cropped_images/          # Output folder for cropped ID card images
-├── temp_uploads/            # Temporary uploaded images from API
-├── templates/               # HTML templates for web interface
-│   └── index.html           # Main web interface
-│
-├── dataset/                 # Raw dataset images for training/testing 
-├── cropped_dataset/         # Training data for OCR/detection
-├── results/                 # Output results, logs, etc.
-│
-
+├── main.py            # Server FastAPI
+├── m_ocr.py           # Xử lý OCR đa mô hình
+├── cropper.py         # Cắt ảnh CCCD
+├── requirements.txt   # Thư viện Python
+├── README.md          # Tài liệu này
+├── model/             # Chứa các file model
+├── cropped_images/    # Ảnh CCCD đã cắt
+├── temp_uploads/      # Ảnh upload tạm thời
+├── templates/         # Giao diện web (index.html)
+├── dataset/           # (Tùy chọn) Dữ liệu huấn luyện
+├── results/           # (Tùy chọn) Kết quả, log
 ```
 
-## Folder/Files Description
-- **main.py**: FastAPI backend server.
-- **m_ocr.py**: Main OCR logic, combines multiple OCR engines.
-- **cropper.py**: Handles cropping of ID card images.
-- **requirements.txt**: List of required Python packages.
-- **model/**: All model weights/configs for detection and OCR.
-- **cropped_images/**: Where cropped ID card images are saved.
-- **temp_uploads/**: Where uploaded images are temporarily stored.
-- **templates/**: HTML templates for the web interface.
-- **dataset/**, **train_data/**: (Optional) For training/testing purposes.
+## Hướng dẫn sử dụng
 
-## Notes
-- You should create the folders `cropped_images/` and `temp_uploads/` before running the app.
-- The `model/` folder should contain all necessary weights/configs for YOLO, VietOCR, PaddleOCR, and optionally EasyOCR.
-- The app will auto-create output folders if they do not exist, but it's best to prepare the structure in advance.
-
-## Sử dụng
-
-1. Khởi động server:
+1. **Chạy server:**
 ```bash
 uvicorn main:app --reload
 ```
 
-2. Mở trình duyệt và truy cập:
-```
-http://localhost:8000
-```
+2. **Truy cập giao diện web:**
+- Mở trình duyệt và vào địa chỉ: http://localhost:8000
+- Upload ảnh CCCD, hệ thống sẽ tự động cắt và trích xuất thông tin
 
-3. Upload ảnh CCCD và xem kết quả
+3. **Sử dụng API:**
+- `POST /upload`   : Upload ảnh CCCD
+- `POST /crop`     : Cắt vùng CCCD trên ảnh
+- `POST /extract`  : Trích xuất thông tin từ ảnh CCCD đã cắt
 
-## API Endpoints
+## Yêu cầu model
+- Phát hiện CCCD cũ: `model/detect_ttin/cccd_cu.pt`
+- Phát hiện CCCD mới: `model/detect_ttin/cccd_moi.pt`
+- Cắt ảnh CCCD: `model/detect_4goc/best.pt`
+- OCR: `model/finetune_vietocr/transformerocr.pth` và `model/finetune_vietocr/config.yml`
 
-- `POST /upload`: Upload ảnh CCCD
-- `POST /crop`: Cắt ảnh CCCD
-- `POST /extract`: Trích xuất thông tin từ ảnh CCCD
-
-## Các model sử dụng
-
-- Model phát hiện CCCD cũ: model/detect_ttin/cccd_cu.pt
-- Model phát hiện CCCD mới: model/detect_ttin/cccd_moi.pt
-- Model cắt ảnh: model/detect_4goc/cropper.pt
-- Model OCR: model/finetune_vietocr/transformerocr.pth
+## Lưu ý
+- Nên chuẩn bị sẵn các thư mục `cropped_images/` và `temp_uploads/` trước khi chạy.
+- Thư mục `model/` phải chứa đầy đủ các file model cần thiết.
+- Ứng dụng sẽ tự tạo các thư mục đầu ra nếu chưa có.
 
 ## Giấy phép
 
-MIT License 
+Phần mềm phát hành theo giấy phép MIT. 
