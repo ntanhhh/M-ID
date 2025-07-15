@@ -5,7 +5,7 @@
 ## Tính năng
 
 - Phát hiện và phân loại CCCD cũ/mới
-- Cắt ảnh sử dụng YOLOv8
+- Cắt ảnh sử dụng YOLOv11
 - Trích xuất thông tin từ ảnh CCCD
 
 ## Cài đặt
@@ -38,19 +38,44 @@ model/
 
 ```
 CCCD_Extractor/
-├── main.py              # File chính chứa FastAPI endpoints
-├── multimodal_id.py     # Module xử lý CCCD
-├── requirements.txt     # Danh sách thư viện cần thiết
-├── templates/          # Thư mục chứa file HTML
-│   └── index.html      # Giao diện người dùng
-├── static/            # Thư mục chứa file CSS và JavaScript
-│   ├── css/
-│   │   └── style.css  # File CSS
-│   └── js/
-│       └── script.js  # File JavaScript
-├── uploads/           # Thư mục lưu ảnh upload
-└── cropped_images/    # Thư mục lưu ảnh đã cắt
+├── main.py                  # FastAPI server, main entry point
+├── m_ocr.py                 # Multimodal OCR logic (VietOCR, Finetuned VietOCR, PaddleOCR)
+├── croper.py                # Image cropping logic
+├── requirements.txt         # Python dependencies
+├── README.md                # Project documentation (this file)
+│
+├── model/                   # All model files (YOLO, VietOCR, PaddleOCR)
+│   ├── detect_ttin/         # YOLO models for old/new CCCD detection
+│   ├── detect_4goc/         # YOLO model for cropping
+│   ├── finetune_vietocr/    # VietOCR weights and config
+│
+├── cropped_images/          # Output folder for cropped ID card images
+├── temp_uploads/            # Temporary uploaded images from API
+├── templates/               # HTML templates for web interface
+│   └── index.html           # Main web interface
+│
+├── dataset/                 # Raw dataset images for training/testing 
+├── cropped_dataset/         # Training data for OCR/detection
+├── results/                 # Output results, logs, etc.
+│
+
 ```
+
+## Folder/Files Description
+- **main.py**: FastAPI backend server.
+- **m_ocr.py**: Main OCR logic, combines multiple OCR engines.
+- **cropper.py**: Handles cropping of ID card images.
+- **requirements.txt**: List of required Python packages.
+- **model/**: All model weights/configs for detection and OCR.
+- **cropped_images/**: Where cropped ID card images are saved.
+- **temp_uploads/**: Where uploaded images are temporarily stored.
+- **templates/**: HTML templates for the web interface.
+- **dataset/**, **train_data/**: (Optional) For training/testing purposes.
+
+## Notes
+- You should create the folders `cropped_images/` and `temp_uploads/` before running the app.
+- The `model/` folder should contain all necessary weights/configs for YOLO, VietOCR, PaddleOCR, and optionally EasyOCR.
+- The app will auto-create output folders if they do not exist, but it's best to prepare the structure in advance.
 
 ## Sử dụng
 
@@ -78,13 +103,6 @@ http://localhost:8000
 - Model phát hiện CCCD mới: model/detect_ttin/cccd_moi.pt
 - Model cắt ảnh: model/detect_4goc/cropper.pt
 - Model OCR: model/finetune_vietocr/transformerocr.pth
-
-## Yêu cầu hệ thống
-
-- Python 3.8+
-- CUDA (khuyến nghị cho GPU)
-- RAM: 8GB+
-- Ổ cứng: 1GB+ trống
 
 ## Giấy phép
 
