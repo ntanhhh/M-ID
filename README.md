@@ -6,15 +6,15 @@ M-ID features an end-to-end pipeline designed for robust and accurate informatio
 ## Key Features
 - Auto-detect and classify old/new CCCD
 - Crop the ID card region from input images
-- Extract text fields (ID number, full name, DOB, gender, hometown, address, etc.)
+- Extract text fields of the ID card.
 - Simple, user-friendly web UI
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/ntanhhh/CCCD_Extractor.git
-cd CCCD_Extractor
+git clone https://github.com/ntanhhh/M-ID.git
+cd M-ID
 ```
 
 2. Install dependencies:
