@@ -1,32 +1,31 @@
-# CCCD Extractor
+# M-ID Architecture
 
-Ứng dụng trích xuất thông tin từ ảnh căn cước công dân (CCCD) sử dụng FastAPI, YOLOv8 và các mô hình OCR.
+![M-ID Architecture](assets/M-ID.png)
+M-ID features an end-to-end pipeline designed for robust and accurate information extraction from Vietnamese Citizen ID Card images.
 
-## Chức năng chính
-- Phát hiện và phân loại CCCD cũ/mới tự động
-- Cắt vùng chứa CCCD trên ảnh đầu vào
-- Trích xuất thông tin văn bản từ ảnh CCCD (số, họ tên, ngày sinh, giới tính, quê quán, nơi thường trú...)
-- Giao diện web đơn giản, dễ sử dụng
-- Hỗ trợ API cho tích hợp hệ thống khác
+## Key Features
+- Auto-detect and classify old/new CCCD
+- Crop the ID card region from input images
+- Extract text fields (ID number, full name, DOB, gender, hometown, address, etc.)
+- Simple, user-friendly web UI
 
-## Hướng dẫn cài đặt
+## Installation
 
-1. **Clone mã nguồn:**
+1. Clone the repository:
 ```bash
 git clone https://github.com/ntanhhh/CCCD_Extractor.git
 cd CCCD_Extractor
 ```
 
-2. **Cài đặt thư viện Python:**
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Tải các model cần thiết:**
-- Tải các file model từ [Google Drive](https://drive.google.com/drive/folders/14t1fJQrsg2noPLxsUB854mmRwEP9vU6d?usp=sharing)
-- Đặt vào thư mục `model/` với cấu trúc:
+3. Download required models from [Google Drive](https://drive.google.com/drive/folders/14t1fJQrsg2noPLxsUB854mmRwEP9vU6d?usp=sharing) and place them under `model/` as follows:
 ```
 model/
+├── vgg_transformer.pth
 ├── detect_ttin/
 │   ├── cccd_cu.pt
 │   └── cccd_moi.pt
@@ -35,55 +34,53 @@ model/
 └── finetune_vietocr/
     ├── config.yml
     └── transformerocr.pth
+
+
 ```
 
-4. **Tạo các thư mục cần thiết:**
-- `cropped_images/` : Lưu ảnh CCCD đã cắt
-- `temp_uploads/`   : Lưu ảnh upload tạm thời
-
-## Cấu trúc thư mục dự án
+## Project Structure
 ```
 CCCD_Extractor/
-├── main.py            # Server FastAPI
-├── m_ocr.py           # Xử lý OCR đa mô hình
-├── cropper.py         # Cắt ảnh CCCD
-├── requirements.txt   # Thư viện Python
-├── README.md          # Tài liệu này
-├── model/             # Chứa các file model
-├── cropped_images/    # Ảnh CCCD đã cắt
-├── temp_uploads/      # Ảnh upload tạm thời
-├── templates/         # Giao diện web (index.html)
-├── dataset/           # (Tùy chọn) Dữ liệu huấn luyện
-├── results/           # (Tùy chọn) Kết quả, log
+├── main.py            # FastAPI server
+├── m_ocr.py           # Multi-engine OCR pipeline
+├── cropper.py         # CCCD region cropping
+├── requirements.txt   # Python dependencies
+├── README.md          # This document
+├── model/             # Model files
+├── cropped_images/    # Cropped CCCD images
+├── temp_uploads/      # Temporary uploads
+├── templates/         # Web UI (index.html)
+├── dataset/           # (Optional) Training data
+├── results/           # (Optional) Outputs, logs
 ```
 
-## Hướng dẫn sử dụng
+## Usage
 
-1. **Chạy server:**
+1. Run the server:
 ```bash
 uvicorn main:app --reload
 ```
 
-2. **Truy cập giao diện web:**
-- Mở trình duyệt và vào địa chỉ: http://localhost:8000
-- Upload ảnh CCCD, hệ thống sẽ tự động cắt và trích xuất thông tin
+2. Open the web UI:
+- Visit http://localhost:8000
+- Upload a CCCD image; the system will crop and extract information automatically
 
-3. **Sử dụng API:**
-- `POST /upload`   : Upload ảnh CCCD
-- `POST /crop`     : Cắt vùng CCCD trên ảnh
-- `POST /extract`  : Trích xuất thông tin từ ảnh CCCD đã cắt
+3. API endpoints:
+- `POST /upload`   – Upload a CCCD image
+- `POST /crop`     – Crop the CCCD region
+- `POST /extract`  – Extract fields from a cropped CCCD image
 
-## Yêu cầu model
-- Phát hiện CCCD cũ: `model/detect_ttin/cccd_cu.pt`
-- Phát hiện CCCD mới: `model/detect_ttin/cccd_moi.pt`
-- Cắt ảnh CCCD: `model/detect_4goc/best.pt`
-- OCR: `model/finetune_vietocr/transformerocr.pth` và `model/finetune_vietocr/config.yml`
+## Model Requirements
+- Old CCCD detection: `model/detect_ttin/cccd_cu.pt`
+- New CCCD detection: `model/detect_ttin/cccd_moi.pt`
+- CCCD cropping: `model/detect_4goc/best.pt`
+- OCR: `model/finetune_vietocr/transformerocr.pth` and `model/finetune_vietocr/config.yml`
+- VGG Transformer OCR weights: `model/vgg_transformer.pth`
 
-## Lưu ý
-- Nên chuẩn bị sẵn các thư mục `cropped_images/` và `temp_uploads/` trước khi chạy.
-- Thư mục `model/` phải chứa đầy đủ các file model cần thiết.
-- Ứng dụng sẽ tự tạo các thư mục đầu ra nếu chưa có.
+## Notes
+- Prepare `cropped_images/` and `temp_uploads/` before running, or they will be created automatically.
+- Ensure all required model files exist under `model/`.
 
-## Giấy phép
+## License
 
-Phần mềm phát hành theo giấy phép MIT. 
+MIT License
