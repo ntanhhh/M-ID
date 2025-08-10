@@ -29,7 +29,7 @@ def non_max_suppression_fast(boxes, labels, overlapThresh):
     return boxes[pick].astype("int"), [labels[idx] for idx in pick]
 
 def find_missing_corner(coords):
-    # Kiểm tra cả nhãn mới và cũ
+    # Check both new and old corner labels
     corners = ['top_left_new', 'top_right_new', 'bottom_left_new', 'bottom_right_new',
               'top_left_old', 'top_right_old', 'bottom_left_old', 'bottom_right_old']
     missing = [c for c in corners if c not in coords]
@@ -40,11 +40,11 @@ def estimate_missing_corner(coords):
     if not missing:
         return coords
 
-    # Xác định loại góc (new hoặc old)
+    # Determine corner type (new or old)
     corner_type = 'new' if 'new' in missing else 'old'
     base_corner = missing.replace('_new', '').replace('_old', '')
 
-    # Lấy các góc tương ứng
+    # Choose reference and target corners
     if base_corner == 'top_left':
         ref1 = f'top_right_{corner_type}'
         ref2 = f'bottom_left_{corner_type}'
@@ -62,12 +62,12 @@ def estimate_missing_corner(coords):
         ref2 = f'bottom_left_{corner_type}'
         target = f'top_left_{corner_type}'
 
-    # Kiểm tra xem các góc tham chiếu có tồn tại không
+    # Validate that reference corners exist
     if ref1 not in coords or ref2 not in coords or target not in coords:
-        print(f"Không đủ góc để nội suy góc {missing}")
+        print(f"Not enough corners to interpolate corner {missing}")
         return coords
 
-    # Tính toán góc thiếu
+    # Estimate the missing corner by symmetry
     mid_x = (coords[ref1][0] + coords[ref2][0]) / 2
     mid_y = (coords[ref1][1] + coords[ref2][1]) / 2
     coords[missing] = [2 * mid_x - coords[target][0],
@@ -77,7 +77,7 @@ def estimate_missing_corner(coords):
 def perspective_transform(image, points, corner_type='new'):
     dest_points = np.float32([[0, 0], [500, 0], [500, 300], [0, 300]])
     
-    # Kiểm tra xem tất cả các góc cần thiết có tồn tại không
+    # Ensure all required corners exist
     required_corners = [
         f'top_left_{corner_type}',
         f'top_right_{corner_type}',
@@ -87,7 +87,7 @@ def perspective_transform(image, points, corner_type='new'):
     
     for corner in required_corners:
         if corner not in points:
-            print(f"Thiếu góc {corner}, không thể thực hiện perspective transform")
+            print(f"Missing corner {corner}, cannot apply perspective transform")
             return image
 
     source_points = np.float32([
@@ -101,7 +101,7 @@ def perspective_transform(image, points, corner_type='new'):
         M = cv2.getPerspectiveTransform(source_points, dest_points)
         return cv2.warpPerspective(image, M, (510, 310))
     except Exception as e:
-        print(f"Lỗi khi thực hiện perspective transform: {str(e)}")
+        print(f"Error during perspective transform: {str(e)}")
         return image
 
 def crop_image(result, img):
@@ -112,7 +112,7 @@ def crop_image(result, img):
 
     valid_indices = [i for i, conf in enumerate(confidences) if conf >= 0.5]
     if not valid_indices:
-        print("Không có bounding box nào đạt ngưỡng confidence 0.5. Giữ nguyên ảnh.")
+        print("No bounding box meets confidence >= 0.5. Keeping original image.")
         return img
 
     tensor = tensor[valid_indices]
@@ -123,7 +123,7 @@ def crop_image(result, img):
     final_boxes, final_labels = non_max_suppression_fast(tensor, labels, 0.3)
 
     if len(final_boxes) < 2:
-        print("Detect được quá ít điểm (<2). Giữ nguyên ảnh.")
+        print("Too few points detected (<2). Keeping original image.")
         return img
 
     # Chọn box có độ tin cậy cao nhất cho mỗi label
@@ -154,37 +154,37 @@ def crop_image(result, img):
     has_all_corners_new = set(final_points.keys()) >= required_labels_new
     has_all_corners_old = set(final_points.keys()) >= required_labels_old
 
-    print(f"- Diện tích vùng phát hiện: {ratio*100:.2f}% so với ảnh")
+    print(f"- Detected region area: {ratio*100:.2f}% of image")
 
     if has_all_corners_new or has_all_corners_old:
         if ratio > 0.85:
-            print("Ảnh đã chụp quá sát, giữ nguyên ảnh, không cắt.")
+            print("Image is too close-up, keep original.")
             return img
         else:
             corner_type = 'new' if has_all_corners_new else 'old'
-            print(f"Đủ 4 góc ({corner_type}) và thỏa mãn các điều kiện. Tiến hành crop.")
+            print(f"All 4 corners ({corner_type}) found and conditions met. Proceed to crop.")
             return perspective_transform(img, final_points, corner_type)
     else:
         if ratio > 0.85:
-            print("Ảnh đã chụp sát, không cần cắt thêm.")
+            print("Image is close-up, no further crop needed.")
             return img
         else:
-            # Thử nội suy góc thiếu cho cả new và old
+            # Try to estimate the missing corner (new or old)
             missing = find_missing_corner(final_points)
             if missing:
-                print(f"Phát hiện thiếu góc {missing}, thử nội suy...")
+                print(f"Detected missing corner {missing}")
                 estimated_points = estimate_missing_corner(final_points.copy())
                 corner_type = 'new' if 'new' in missing else 'old'
-                print(f"Đã nội suy góc thiếu ({corner_type}), tiến hành crop.")
+                print(f"Estimated missing corner ({corner_type}). Proceed to crop.")
                 return perspective_transform(img, estimated_points, corner_type)
             else:
-                print("Ảnh không đủ góc, không thể crop. Giữ nguyên ảnh.")
+                print("Insufficient corners to crop. Keeping original image.")
                 return img
 
 def process_image(image_path, output_dir, model):
     img = cv2.imread(image_path)
     if img is None:
-        print(f"Lỗi: Không thể đọc ảnh {image_path}")
+        print(f"Error: Cannot read image {image_path}")
         return None
 
     results = model(image_path)
@@ -196,14 +196,14 @@ def process_image(image_path, output_dir, model):
             output_filename = f"cropped_{uuid.uuid4().hex}.jpg"
             output_path = os.path.join(output_dir, output_filename)
             cv2.imwrite(output_path, cropped_img)
-            print(f"Ảnh đã được cắt và lưu tại: {output_path}")
+            print(f"Cropped image saved at: {output_path}")
             return output_filename
 
-    print(f"Không đủ góc để cắt ảnh: {image_path}")
+    print(f"Insufficient corners to crop image: {image_path}")
     return None
 
 if __name__ == "__main__":
-    model = YOLO("model/detect_4goc/best.pt")
-    image_path = "test_images/20240128141643_082094002302cicekycfront0_jpg.rf.3ff740beeb2d6c843f77f399fc19f2c3.jpg"
+    model = YOLO("model/detect_4goc/cropper.pt")
+    image_path = ""
     output_dir = "cropped_images"
     process_image(image_path, output_dir, model)

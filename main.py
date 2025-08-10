@@ -16,7 +16,7 @@ from ultralytics import YOLO
 
 app = FastAPI(title="ID Card Processing API")
 
-# Cấu hình CORS
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,20 +25,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cấu hình templates
+# Templates configuration
 templates = Jinja2Templates(directory="templates")
 
-# Tạo thư mục để lưu ảnh tạm thời
+# Create directories for temporary and cropped images
 UPLOAD_DIR = "temp_uploads"
 CROPPED_DIR = "cropped_images"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(CROPPED_DIR, exist_ok=True)
 
-# Mount thư mục cropped_images để phục vụ file tĩnh
+# Serve cropped_images as static files
 app.mount("/cropped_images", StaticFiles(directory="cropped_images"), name="cropped_images")
 
-# Khởi tạo các model
-crop_model = YOLO("model/detect_4goc/best.pt")
+# Initialize models
+crop_model = YOLO("model/detect_4goc/cropper.pt")
 id_system = MOCRSystem()
 
 class FilePath(BaseModel):
@@ -51,16 +51,16 @@ async def read_root(request: Request):
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
     try:
-        # Tạo tên file duy nhất
+        # Generate a unique filename
         file_extension = os.path.splitext(file.filename)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         file_path = os.path.join(UPLOAD_DIR, unique_filename)
         
-        # Lưu file
+        # Save file
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        return {"message": "Upload thành công", "file_path": file_path}
+        return {"message": "Upload successful", "file_path": file_path}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -68,19 +68,19 @@ async def upload_image(file: UploadFile = File(...)):
 async def crop_image(file_data: FilePath):
     try:
         print(f"Received file path: {file_data.file_path}")
-        # Kiểm tra file tồn tại
+        # Check the file exists
         if not os.path.exists(file_data.file_path):
             print(f"File not found at path: {file_data.file_path}")
-            raise HTTPException(status_code=404, detail=f"Không tìm thấy file tại đường dẫn: {file_data.file_path}")
+            raise HTTPException(status_code=404, detail=f"File not found at path: {file_data.file_path}")
         
-        # Cắt ảnh sử dụng cropper
+        # Crop image using cropper
         cropped_filename = process_image(file_data.file_path, CROPPED_DIR, crop_model)
         if not cropped_filename:
-            raise HTTPException(status_code=400, detail="Không thể cắt ảnh")
+            raise HTTPException(status_code=400, detail="Unable to crop image")
         
         return {
             "status": "success",
-            "message": "Cắt ảnh thành công",
+            "message": "Cropping successful",
             "cropped_image_path": cropped_filename
         }
     except Exception as e:
@@ -90,24 +90,24 @@ async def crop_image(file_data: FilePath):
 @app.post("/extract")
 async def extract_info(file_data: FilePath):
     try:
-        # Tạo đường dẫn đầy đủ cho file đã cắt
+        # Build full path to cropped file
         full_path = os.path.join(CROPPED_DIR, file_data.file_path)
         print(f"Extracting info from file: {full_path}")
         
-        # Kiểm tra file tồn tại
+        # Check the file exists
         if not os.path.exists(full_path):
             print(f"File not found at path: {full_path}")
-            raise HTTPException(status_code=404, detail="Không tìm thấy file")
+            raise HTTPException(status_code=404, detail="File not found")
         
-        # Xử lý ảnh bằng m_ocr
+        # Process image with m_ocr
         try:
             result = id_system.process_id_card(full_path)
             if not result:
                 print("No result returned from process_id_card")
-                raise HTTPException(status_code=400, detail="Không thể xử lý thông tin ID")
+                raise HTTPException(status_code=400, detail="Unable to process ID information")
         except Exception as e:
             print(f"Error in process_id_card: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Lỗi xử lý ảnh: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Image processing error: {str(e)}")
         
         return {
             "status": "success",
@@ -118,7 +118,7 @@ async def extract_info(file_data: FilePath):
         raise he
     except Exception as e:
         print(f"Unexpected error in extract_info: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Lỗi không xác định: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
